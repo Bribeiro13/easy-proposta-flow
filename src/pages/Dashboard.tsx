@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,33 +16,46 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Dados mockados das propostas
-  const [proposals] = useState([
-    {
-      id: 1,
-      title: "Website Institucional - Empresa ABC",
-      client: "João Silva",
-      value: 2500,
-      status: "pending",
-      createdAt: "2024-01-15",
-      viewCount: 3
-    },
-    {
-      id: 2,
-      title: "Logotipo e Identidade Visual",
-      client: "Maria Santos",
-      value: 800,
-      status: "approved",
-      createdAt: "2024-01-10",
-      viewCount: 5
-    }
-  ]);
+  // Carrega propostas do localStorage
+  const [proposals, setProposals] = useState([]);
+
+  useEffect(() => {
+    const loadProposals = () => {
+      const savedProposals = JSON.parse(localStorage.getItem('proposals') || '[]');
+      
+      // Converte os dados para o formato esperado pelo dashboard
+      const formattedProposals = savedProposals.map((proposal, index) => ({
+        id: proposal.id || index + 1,
+        title: proposal.serviceTitle || "Proposta de Serviço",
+        client: proposal.clientName || "Cliente",
+        value: parseFloat(proposal.totalValue) || 0,
+        status: "pending", // Por padrão, novas propostas ficam pendentes
+        createdAt: proposal.createdAt ? proposal.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+        viewCount: 0 // Inicia com 0 visualizações
+      }));
+      
+      setProposals(formattedProposals);
+    };
+
+    loadProposals();
+    
+    // Adiciona listener para atualizar quando uma nova proposta for criada
+    const handleStorageChange = () => {
+      loadProposals();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -82,6 +94,10 @@ const Dashboard = () => {
     navigate('/login');
     return null;
   }
+
+  const totalValue = proposals.reduce((sum, proposal) => sum + proposal.value, 0);
+  const approvedProposals = proposals.filter(p => p.status === 'approved').length;
+  const approvalRate = proposals.length > 0 ? Math.round((approvedProposals / proposals.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -131,7 +147,7 @@ const Dashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{proposals.length}</div>
               <p className="text-xs text-muted-foreground">
-                {user.plan === 'free' ? `${3 - proposals.length} restantes este mês` : 'Ilimitadas'}
+                {user.plan === 'free' ? `${Math.max(0, 3 - proposals.length)} restantes este mês` : 'Ilimitadas'}
               </p>
             </CardContent>
           </Card>
@@ -142,9 +158,9 @@ const Dashboard = () => {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">50%</div>
+              <div className="text-2xl font-bold">{approvalRate}%</div>
               <p className="text-xs text-muted-foreground">
-                1 de 2 propostas aprovadas
+                {approvedProposals} de {proposals.length} propostas aprovadas
               </p>
             </CardContent>
           </Card>
@@ -155,7 +171,7 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">R$ 3.300</div>
+              <div className="text-2xl font-bold">R$ {totalValue.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 Em propostas criadas
               </p>
@@ -243,10 +259,12 @@ const Dashboard = () => {
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-4 h-4 mr-1" />
-                          Ver
-                        </Button>
+                        <Link to={`/proposal/${proposal.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="w-4 h-4 mr-1" />
+                            Ver
+                          </Button>
+                        </Link>
                         <Button variant="outline" size="sm">
                           <Edit className="w-4 h-4 mr-1" />
                           Editar
@@ -266,6 +284,39 @@ const Dashboard = () => {
       </div>
     </div>
   );
+
+  function getStatusIcon(status: string) {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'rejected':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+    }
+  }
+
+  function getStatusText(status: string) {
+    switch (status) {
+      case 'approved':
+        return 'Aprovada';
+      case 'rejected':
+        return 'Rejeitada';
+      default:
+        return 'Pendente';
+    }
+  }
+
+  function getStatusVariant(status: string) {
+    switch (status) {
+      case 'approved':
+        return 'default';
+      case 'rejected':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  }
 };
 
 export default Dashboard;
