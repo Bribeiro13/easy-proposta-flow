@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +14,9 @@ import {
   Briefcase
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const ViewProposal = () => {
   const { id } = useParams();
@@ -23,6 +24,8 @@ const ViewProposal = () => {
   const [isAccepted, setIsAccepted] = useState(false);
   const [proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Busca a proposta no localStorage
@@ -139,9 +142,55 @@ O site será desenvolvido utilizando as melhores práticas de desenvolvimento we
     window.open(whatsappUrl, '_blank');
   };
 
-  const handleDownloadPDF = () => {
-    // Simula download do PDF
-    alert('Download do PDF iniciado!');
+  const handleDownloadPDF = async () => {
+    if (!pdfRef.current || !proposal) return;
+    
+    setGeneratingPDF(true);
+    
+    try {
+      // Configurações do canvas para melhor qualidade
+      const canvas = await html2canvas(pdfRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Dimensões da página A4
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calcular dimensões da imagem para caber na página
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      // Se a imagem for maior que a página, adicionar múltiplas páginas
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+      
+      // Salvar o PDF
+      const fileName = `proposta-${proposal.client.name.replace(/\s+/g, '-').toLowerCase()}-${id}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   if (loading) {
@@ -207,186 +256,193 @@ O site será desenvolvido utilizando as melhores práticas de desenvolvimento we
           </div>
         )}
 
-        {/* Main Content */}
-        <div className="grid gap-8">
-          {/* Client & Provider Info */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <User className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold text-gray-900">Cliente</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">{proposal.client.name}</p>
-                  {proposal.client.company && (
-                    <p className="text-gray-600">{proposal.client.company}</p>
-                  )}
-                  <p className="text-gray-600">{proposal.client.email}</p>
-                  <p className="text-gray-600">{proposal.client.phone}</p>
-                </div>
-              </CardContent>
-            </Card>
+        {/* PDF Content - This will be captured for PDF generation */}
+        <div ref={pdfRef} className="bg-white p-8 rounded-lg shadow-sm mb-8">
+          {/* PDF Header with Logo */}
+          <div className="flex items-center justify-between mb-8 pb-6 border-b">
+            <div className="flex items-center space-x-4">
+              {proposal.provider.logo && (
+                <img 
+                  src={proposal.provider.logo} 
+                  alt="Logo da empresa" 
+                  className="w-16 h-16 object-contain"
+                />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">PROPOSTA COMERCIAL</h1>
+                <p className="text-gray-600">#{proposal.id}</p>
+              </div>
+            </div>
+            <div className="text-right text-sm text-gray-600">
+              <p>Criada em: {new Date(proposal.createdAt).toLocaleDateString('pt-BR')}</p>
+              <p>Válida até: {new Date(proposal.validUntil).toLocaleDateString('pt-BR')}</p>
+            </div>
+          </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Briefcase className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold text-gray-900">Prestador</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">{proposal.provider.name}</p>
-                  <p className="text-gray-600">{proposal.provider.email}</p>
-                  <p className="text-gray-600">{proposal.provider.phone}</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Client & Provider Info */}
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
+            <div>
+              <h3 className="flex items-center font-semibold text-gray-900 mb-4">
+                <User className="w-5 h-5 text-primary mr-2" />
+                DADOS DO CLIENTE
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-lg">{proposal.client.name}</p>
+                {proposal.client.company && (
+                  <p className="text-gray-700">{proposal.client.company}</p>
+                )}
+                <p className="text-gray-700">{proposal.client.email}</p>
+                <p className="text-gray-700">{proposal.client.phone}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="flex items-center font-semibold text-gray-900 mb-4">
+                <Briefcase className="w-5 h-5 text-primary mr-2" />
+                PRESTADOR DE SERVIÇO
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-lg">{proposal.provider.name}</p>
+                <p className="text-gray-700">{proposal.provider.email}</p>
+                <p className="text-gray-700">{proposal.provider.phone}</p>
+              </div>
+            </div>
           </div>
 
           {/* Service Description */}
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">{proposal.service.title}</h3>
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-line text-gray-700 leading-relaxed">
-                  {proposal.service.description}
-                </div>
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">{proposal.service.title}</h3>
+            <div className="prose prose-sm max-w-none">
+              <div className="whitespace-pre-line text-gray-700 leading-relaxed text-base">
+                {proposal.service.description}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Pricing & Timeline */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <DollarSign className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold text-gray-900">Investimento</h3>
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
+            <div className="bg-primary/5 p-6 rounded-lg">
+              <h3 className="flex items-center font-semibold text-gray-900 mb-4">
+                <DollarSign className="w-5 h-5 text-primary mr-2" />
+                INVESTIMENTO
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-3xl font-bold text-primary">
+                    R$ {proposal.pricing.totalValue.toLocaleString()}
+                  </p>
+                  <p className="text-gray-600">Valor total</p>
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      R$ {proposal.pricing.totalValue.toLocaleString()}
-                    </p>
-                    <p className="text-gray-600 text-sm">Valor total</p>
-                  </div>
-                  <Separator />
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      <span className="font-medium">Parcelas:</span>{" "}
-                      {proposal.pricing.installments}x de R$ {proposal.pricing.installmentValue.toLocaleString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">Forma de pagamento:</span>{" "}
-                      {proposal.pricing.paymentMethod}
-                    </p>
-                  </div>
+                <div className="border-t pt-3 space-y-1">
+                  <p>
+                    <span className="font-medium">Parcelas:</span>{" "}
+                    {proposal.pricing.installments}x de R$ {proposal.pricing.installmentValue.toLocaleString()}
+                  </p>
+                  <p>
+                    <span className="font-medium">Forma de pagamento:</span>{" "}
+                    {proposal.pricing.paymentMethod}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold text-gray-900">Cronograma</h3>
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h3 className="flex items-center font-semibold text-gray-900 mb-4">
+                <Calendar className="w-5 h-5 text-primary mr-2" />
+                CRONOGRAMA
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="font-medium text-gray-900">Prazo de entrega</p>
+                  <p className="text-gray-700 text-lg">{proposal.timeline.deliveryDays} dias úteis</p>
                 </div>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">Prazo de entrega</p>
-                    <p className="text-gray-600">{proposal.timeline.deliveryDays} dias úteis</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Início previsto</p>
-                    <p className="text-gray-600">
-                      {new Date(proposal.timeline.startDate).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Garantia</p>
-                    <p className="text-gray-600">{proposal.warranty}</p>
-                  </div>
+                <div>
+                  <p className="font-medium text-gray-900">Início previsto</p>
+                  <p className="text-gray-700">
+                    {new Date(proposal.timeline.startDate).toLocaleDateString('pt-BR')}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="font-medium text-gray-900">Garantia</p>
+                  <p className="text-gray-700">{proposal.warranty}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Conditions */}
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Condições Gerais</h3>
-              <div className="whitespace-pre-line text-gray-700 text-sm leading-relaxed">
-                {proposal.conditions}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-8">
+            <h3 className="font-semibold text-gray-900 mb-4 text-xl">CONDIÇÕES GERAIS</h3>
+            <div className="whitespace-pre-line text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
+              {proposal.conditions}
+            </div>
+          </div>
 
           {/* Observations */}
           {proposal.observations && (
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Observações</h3>
-                <div className="text-gray-700 text-sm leading-relaxed">
-                  {proposal.observations}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="mb-8">
+              <h3 className="font-semibold text-gray-900 mb-4 text-xl">OBSERVAÇÕES</h3>
+              <div className="text-gray-700 leading-relaxed bg-blue-50 p-4 rounded-lg">
+                {proposal.observations}
+              </div>
+            </div>
           )}
 
-          {/* Action Buttons */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4 text-center">
-                Gostou da proposta?
-              </h3>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  onClick={handleWhatsAppAccept}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  size="lg"
-                >
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Aceitar via WhatsApp
-                </Button>
-                <Button 
-                  onClick={handleDownloadPDF}
-                  variant="outline"
-                  size="lg"
-                  className="flex-1"
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  Baixar PDF
-                </Button>
-                <Button 
-                  onClick={handleWhatsAppReject}
-                  variant="outline"
-                  size="lg"
-                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                >
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Não tenho interesse
-                </Button>
+          {/* Footer */}
+          <div className="text-center pt-8 border-t">
+            <div className="flex items-center justify-center space-x-2 text-gray-400">
+              <div className="w-6 h-6 bg-gray-300 rounded flex items-center justify-center">
+                <FileText className="w-4 h-4" />
               </div>
-              
-              <div className="mt-4 text-center">
-                <p className="text-xs text-gray-500">
-                  Proposta válida até {new Date(proposal.validUntil).toLocaleDateString('pt-BR')} • 
-                  Criada em {new Date(proposal.createdAt).toLocaleDateString('pt-BR')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-12 pb-8">
-          <div className="flex items-center justify-center space-x-2 text-gray-400">
-            <div className="w-6 h-6 bg-gray-300 rounded flex items-center justify-center">
-              <FileText className="w-4 h-4" />
+              <span className="text-sm">Criado com Proposta Rápida</span>
             </div>
-            <span className="text-sm">Criado com Proposta Rápida</span>
           </div>
         </div>
+
+        {/* Action Buttons */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 text-center">
+              Gostou da proposta?
+            </h3>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button 
+                onClick={handleWhatsAppAccept}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                size="lg"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Aceitar via WhatsApp
+              </Button>
+              <Button 
+                onClick={handleDownloadPDF}
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                disabled={generatingPDF}
+              >
+                <Download className="w-5 h-5 mr-2" />
+                {generatingPDF ? 'Gerando PDF...' : 'Baixar PDF'}
+              </Button>
+              <Button 
+                onClick={handleWhatsAppReject}
+                variant="outline"
+                size="lg"
+                className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Não tenho interesse
+              </Button>
+            </div>
+            
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">
+                Proposta válida até {new Date(proposal.validUntil).toLocaleDateString('pt-BR')} • 
+                Criada em {new Date(proposal.createdAt).toLocaleDateString('pt-BR')}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
