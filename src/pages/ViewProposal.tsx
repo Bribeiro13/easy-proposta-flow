@@ -14,32 +14,75 @@ import {
   User,
   Briefcase
 } from "lucide-react";
-import { useParams } from "react-router-dom";
-import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 const ViewProposal = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [isAccepted, setIsAccepted] = useState(false);
-  
-  // Dados mockados da proposta
-  const proposal = {
-    id: id,
-    title: "Website Institucional - Empresa ABC",
-    client: {
-      name: "João Silva",
-      company: "Empresa ABC Ltda",
-      email: "joao@empresa.com",
-      phone: "(11) 99999-9999"
-    },
-    provider: {
-      name: "Maria Designer",
-      email: "maria@designer.com",
-      phone: "(11) 88888-8888",
-      logo: null
-    },
-    service: {
-      title: "Criação de Website Institucional Responsivo",
-      description: `Desenvolvimento completo de website institucional responsivo com as seguintes características:
+  const [proposal, setProposal] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Busca a proposta no localStorage
+    const savedProposals = JSON.parse(localStorage.getItem('proposals') || '[]');
+    const foundProposal = savedProposals.find((p: any) => p.id === id);
+    
+    if (foundProposal) {
+      // Converte os dados para o formato esperado
+      const formattedProposal = {
+        id: foundProposal.id,
+        title: foundProposal.serviceTitle || "Proposta de Serviço",
+        client: {
+          name: foundProposal.clientName,
+          company: foundProposal.clientCompany,
+          email: foundProposal.clientEmail,
+          phone: foundProposal.clientPhone
+        },
+        provider: foundProposal.provider,
+        service: {
+          title: foundProposal.serviceTitle,
+          description: foundProposal.serviceDescription
+        },
+        pricing: {
+          totalValue: parseFloat(foundProposal.totalValue) || 0,
+          installments: parseInt(foundProposal.installments) || 1,
+          paymentMethod: foundProposal.paymentMethod?.toUpperCase() || "PIX",
+          installmentValue: (parseFloat(foundProposal.totalValue) || 0) / (parseInt(foundProposal.installments) || 1)
+        },
+        timeline: {
+          deliveryDays: parseInt(foundProposal.deliveryDays) || 0,
+          startDate: foundProposal.startDate || new Date().toISOString().split('T')[0]
+        },
+        conditions: foundProposal.conditions || "Não especificado",
+        warranty: foundProposal.warranty || "30 dias",
+        observations: foundProposal.observations || "",
+        createdAt: foundProposal.createdAt || new Date().toISOString(),
+        validUntil: foundProposal.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      };
+      
+      setProposal(formattedProposal);
+    } else {
+      // Se não encontrar a proposta, usa dados mockados
+      setProposal({
+        id: id,
+        title: "Website Institucional - Empresa ABC",
+        client: {
+          name: "João Silva",
+          company: "Empresa ABC Ltda",
+          email: "joao@empresa.com",
+          phone: "(11) 99999-9999"
+        },
+        provider: {
+          name: "Maria Designer",
+          email: "maria@designer.com",
+          phone: "(11) 88888-8888",
+          logo: null
+        },
+        service: {
+          title: "Criação de Website Institucional Responsivo",
+          description: `Desenvolvimento completo de website institucional responsivo com as seguintes características:
 
 • Design moderno e profissional
 • Layout responsivo (mobile, tablet, desktop)
@@ -52,30 +95,35 @@ const ViewProposal = () => {
 • Treinamento para uso do painel
 
 O site será desenvolvido utilizando as melhores práticas de desenvolvimento web, garantindo velocidade de carregamento e uma experiência de usuário excepcional.`
-    },
-    pricing: {
-      totalValue: 2500,
-      installments: 2,
-      paymentMethod: "PIX",
-      installmentValue: 1250
-    },
-    timeline: {
-      deliveryDays: 15,
-      startDate: "2024-02-01"
-    },
-    conditions: `• Aprovação do briefing antes do início dos trabalhos
+        },
+        pricing: {
+          totalValue: 2500,
+          installments: 2,
+          paymentMethod: "PIX",
+          installmentValue: 1250
+        },
+        timeline: {
+          deliveryDays: 15,
+          startDate: "2024-02-01"
+        },
+        conditions: `• Aprovação do briefing antes do início dos trabalhos
 • 50% do valor no início, 50% na entrega
 • Prazo de entrega sujeito à aprovação de materiais
 • Revisões: até 3 rodadas de ajustes incluídas
 • Conteúdo (textos e imagens) por conta do cliente
 • Garantia de 30 dias para correções`,
-    warranty: "30 dias",
-    observations: "Agradecemos a oportunidade de apresentar esta proposta. Estamos à disposição para esclarecimentos e ansiosos para dar vida ao seu projeto!",
-    createdAt: "2024-01-15",
-    validUntil: "2024-02-15"
-  };
+        warranty: "30 dias",
+        observations: "Agradecemos a oportunidade de apresentar esta proposta. Estamos à disposição para esclarecimentos e ansiosos para dar vida ao seu projeto!",
+        createdAt: "2024-01-15",
+        validUntil: "2024-02-15"
+      });
+    }
+    
+    setLoading(false);
+  }, [id]);
 
   const handleWhatsAppAccept = () => {
+    if (!proposal) return;
     const message = `Olá! Gostaria de *ACEITAR* a proposta "${proposal.title}" no valor de R$ ${proposal.pricing.totalValue.toLocaleString()}. Podemos prosseguir?`;
     const phone = proposal.provider.phone.replace(/\D/g, '');
     const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
@@ -84,6 +132,7 @@ O site será desenvolvido utilizando as melhores práticas de desenvolvimento we
   };
 
   const handleWhatsAppReject = () => {
+    if (!proposal) return;
     const message = `Olá! Analisei a proposta "${proposal.title}" mas infelizmente não poderemos prosseguir neste momento. Obrigado pela atenção!`;
     const phone = proposal.provider.phone.replace(/\D/g, '');
     const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
@@ -94,6 +143,30 @@ O site será desenvolvido utilizando as melhores práticas de desenvolvimento we
     // Simula download do PDF
     alert('Download do PDF iniciado!');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando proposta...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposal) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Proposta não encontrada</h1>
+          <Button onClick={() => navigate('/dashboard')}>
+            Voltar ao Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

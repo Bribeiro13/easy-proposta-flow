@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,12 +97,34 @@ const CreateProposal = () => {
   };
 
   const handleSubmit = () => {
-    // Simula criação da proposta
+    // Gera um ID único para a proposta
+    const proposalId = Date.now().toString();
+    
+    // Salva a proposta no localStorage para demonstração
+    const proposalToSave = {
+      id: proposalId,
+      ...proposalData,
+      createdAt: new Date().toISOString(),
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dias
+      provider: {
+        name: user?.name || "Prestador",
+        email: user?.email || "email@exemplo.com",
+        phone: "(11) 99999-9999"
+      }
+    };
+    
+    // Salva no localStorage
+    const savedProposals = JSON.parse(localStorage.getItem('proposals') || '[]');
+    savedProposals.push(proposalToSave);
+    localStorage.setItem('proposals', JSON.stringify(savedProposals));
+    
     toast({
       title: "Proposta criada com sucesso!",
-      description: "Sua proposta está pronta para ser enviada."
+      description: "Redirecionando para visualização..."
     });
-    navigate("/dashboard");
+    
+    // Redireciona para a página de visualização da proposta
+    navigate(`/proposal/${proposalId}`);
   };
 
   const getStepIcon = (step: number) => {
