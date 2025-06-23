@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,8 @@ import {
   CheckCircle,
   Clock,
   User,
-  Briefcase
+  Briefcase,
+  ArrowLeft
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -224,6 +226,15 @@ O site será desenvolvido utilizando as melhores práticas de desenvolvimento we
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/dashboard')}
+                className="mr-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <FileText className="w-6 h-6 text-white" />
               </div>
